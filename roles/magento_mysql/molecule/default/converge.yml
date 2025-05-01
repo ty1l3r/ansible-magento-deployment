@@ -1,0 +1,7 @@
+---
+  - name: Converge
+    hosts: all
+    gather_facts: yes
+    become: yes
+    roles:
+      - role: exam.magento_mysql

@@ -1,0 +1,13 @@
+---
+mysql_admin_pass: "{{ mysql_admin_pass }}"
+db_user: "{{ db_user_name }}"
+db_pass: "{{ db_pass_secret }}"
+db_name: "magento_db"
+db_user_name: "db_user_name"
+db_pass_mg: "your-db-password"
+#mysql
+db_host: "your-db-host"
+#magento
+nginx_server_name: "your-server-name"
+ip_magento: '%'
+full_ip: 0.0.0.0

@@ -1,0 +1,16 @@
+# Groupe pour les serveurs d'application (Magento, Nginx)
+[magento]
+app-server ansible_host=your-server-ip ansible_user=yourUser ansible_private_key_file=/path/to/key.pem
+
+# Groupe pour les serveurs de base de données (MySQL)
+[mysql]
+db-server ansible_host=your-server-ip ansible_user=yourUser ansible_private_key_file=/path/to/key.pem
+
+# Groupe parent pour les serveurs web (Magento et Nginx) qui utilise les app_servers
+[web:children]
+magento
+
+# Groupe parent pour les serveurs de base de données (MySQL et Magento MySQL) qui utilise les db_servers
+[database:children]
+mysql
+

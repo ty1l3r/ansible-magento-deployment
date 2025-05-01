@@ -1,0 +1,160 @@
+---
+  # tasks file for magento_mysql
+  # Tâches pour installer et configurer MySQL
+
+  # Mise à jour complète du système
+  - name: Mise à jour du cache APT
+    ansible.builtin.apt:
+      update_cache: yes
+    become: true
+    tags: pb0
+
+  - name: Mise à niveau complète du système
+    ansible.builtin.apt:
+      upgrade: dist
+    become: true
+    tags: pb0
+
+  # 0. Installation de Python, pip et des dépendances MySQL
+  - name: Installation des paquets requis
+    ansible.builtin.apt:
+      name:
+        - python3-pip
+        - python3-dev
+        - default-libmysqlclient-dev
+        - build-essential
+        - pkg-config
+      state: present
+    become: true
+    tags: pb1
+
+  # Installation de pymysql avec pip
+  - name: Installation de pymysql
+    ansible.builtin.pip:
+      name: pymysql
+      state: present
+    become: true
+    tags: pb1
+
+  # Installer MySQL
+  - name: Installation du serveur MySQL
+    ansible.builtin.apt:
+      name: mysql-server
+      state: present
+    become: true
+    tags: pb1
+
+  - name: Installation du client MySQL
+    ansible.builtin.apt:
+      name: mysql-client
+      state: present
+    become: true
+    tags: pb1
+
+  # Installer mysqlclient via pip
+  - name: Installation de mysqlclient
+    ansible.builtin.pip:
+      name: mysqlclient
+    become: true
+    tags: pb1
+
+  # 3. Démarrage du service MySQL
+  - name: Démarrage de MySQL
+    ansible.builtin.service:
+      name: mysql
+      state: started
+      enabled: true
+    become: true
+    tags: pb1
+
+  # 4. Vérification du plugin d'authentification root
+  - name: Vérification du mode d'authentification root
+    ansible.builtin.command:
+      cmd: "mysql -u root -e 'SELECT User, Host, plugin FROM mysql.user WHERE User=\"root\";'"
+    register: root_auth_method
+    ignore_errors: true
+    become: true
+    tags: pb1
+
+  # 5. Configurer l'authentification root uniquement si nécessaire
+  - name: Configuration du mot de passe root
+    community.mysql.mysql_user:
+      name: root
+      password: "{{ mysql_admin_pass }}"
+      host: localhost
+      priv: "*.*:ALL,GRANT"
+      plugin: mysql_native_password
+      state: present
+      login_unix_socket: /var/run/mysqld/mysqld.sock
+    when: "'auth_socket' in root_auth_method.stdout"
+    become: true
+    tags: pb1
+
+  # 6. Création de la base de données
+  - name: Création de la base de données
+    community.mysql.mysql_db:
+      name: "{{ db_name }}"
+      state: present
+      login_user: root
+      login_password: "{{ mysql_admin_pass }}"
+    become: true
+    tags: pb1
+
+  # 7. Créer l'utilisateur MySQL pour =Tyler avec un accès depuis n'importe où (%)
+  - name: Création de l'utilisateur MySQL pour =Tyler
+    community.mysql.mysql_user:
+      name: =Tyler
+      password: "{{ db_pass }}"
+      host: '%'
+      priv: "*.*:ALL,GRANT"
+      plugin: mysql_native_password
+      state: present
+      login_user: root
+      login_password: "{{ mysql_admin_pass }}"
+    become: true
+    tags: pb1
+
+  # # 1. Changer le mot de passe MySQL pour l'utilisateur =Tyler
+  # - name: Modification du mot de passe pour =Tyler
+  #   ansible.builtin.mysql_user:
+  #     name: =Tyler
+  #     password: "{{ db_pass }}"
+  #     host: "%"
+  #     priv: '*.*:ALL,GRANT'
+  #     state: present
+  #     login_user: root
+  #     login_password: "{{ mysql_admin_pass }}"
+  #     login_host: "{{ db_host }}"
+  #   become: yes
+  #   tags: mysql_password
+
+  # 9. Flush des privilèges pour activer les changements
+  - name: Appliquer les changements de privilèges
+    community.mysql.mysql_user:
+      name: root
+      priv: "*.*:ALL,GRANT"
+      state: present
+      login_user: root
+      login_password: "{{ mysql_admin_pass }}"
+      host_all: yes
+    become: true
+    tags: pb1
+
+  # 10. Modification de la configuration MySQL pour accepter les connexions externes après toutes les autres configurations
+  - name: Modifier le bind-address pour connexions externes
+    ansible.builtin.lineinfile:
+      path: /etc/mysql/mysql.conf.d/mysqld.cnf
+      regexp: '^bind-address'
+      line: 'bind-address = 0.0.0.0'
+      state: present
+      backup: yes
+    become: true
+    tags: pb1
+
+  # 11. Redémarrage du service MySQL après modification du bind-address pour permettre les connexions externes
+  - name: Redémarrage de MySQL après modification
+    ansible.builtin.service:
+      name: mysql
+      state: restarted
+    become: true
+    tags: pb1

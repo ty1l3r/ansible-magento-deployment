@@ -1,0 +1,27 @@
+---
+  # 1. MySQL
+  - hosts: database
+    become: true
+    vars_files:
+      - secrets.yml
+    roles:
+      - magento_mysql
+
+  # 2. Magento
+  - hosts: web
+    become: true
+    vars_files:
+      - secrets.yml
+      - inventory/group_vars/mysql.yml
+      - inventory/group_vars/magento.yml
+    roles:
+      - magento
+
+  # 3. Nginx
+  - hosts: web
+    become: true
+    vars_files:
+      - secrets.yml
+      - inventory/group_vars/mysql.yml
+    roles:
+      - nginx

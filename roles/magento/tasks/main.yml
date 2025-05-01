@@ -1,0 +1,103 @@
+---
+  # 1. Installation et Configuration de PHP
+  - name: Installer PHP 8.1 et les extensions requises
+    ansible.builtin.apt:
+      name:
+        - php8.1-fpm
+        - php8.1-curl
+        - php8.1-dom
+        - php8.1-gd
+        - php8.1-intl
+        - php8.1-mysql
+        - php8.1-xml
+        - php8.1-soap
+        - php8.1-xsl
+        - php8.1-zip
+        - php8.1-bcmath
+        - php8.1-mbstring
+      update_cache: yes
+      state: present
+    become: true
+    tags: php
+
+  - name: Redémarrer PHP-FPM et Nginx
+    ansible.builtin.service:
+      name: "{{ item }}"
+      state: restarted
+    with_items:
+      - php8.1-fpm
+      - nginx
+    become: true
+    tags: php
+
+  # 2. Téléchargement et Extraction de Magento
+  - name: Télécharger et extraire Magento
+    ansible.builtin.unarchive:
+      src: "https://github.com/magento/magento2/archive/refs/tags/2.4.5.zip"
+      dest: /var/www/html/
+      remote_src: yes
+      creates: /var/www/html/magento2-2.4.5
+    become: true
+    tags: magento_extract
+
+  # 3. Configuration des Permissions
+  - name: Définir la propriété des répertoires Magento à ubuntu:www-data
+    ansible.builtin.command:
+      cmd: chown -R ubuntu:www-data /var/www/html/magento2-2.4.5
+    become: true
+    tags: perm
+
+  - name: Définir les permissions des répertoires Magento spécifiés à 775
+    ansible.builtin.command:
+      cmd: chmod -R 775 /var/www/html/magento2-2.4.5
+    become: true
+    tags: perm
+
+  - name: Définir les permissions des fichiers Magento spécifiés à 664
+    ansible.builtin.command:
+      cmd: find /var/www/html/magento2-2.4.5 -type f -exec chmod 664 {} \;
+    become: true
+    tags: perm
+
+  # 4. Installation de Composer
+  - name: Installer Composer
+    ansible.builtin.shell: |
+      curl -sS https://getcomposer.org/installer | php
+      mv composer.phar /usr/local/bin/composer
+    become: true
+    tags: composer
+
+  # 5. Installation des Dépendances Magento avec Composer
+  - name: Installer les dépendances Magento en utilisant Composer dans le bon répertoire
+    ansible.builtin.command:
+      cmd: php -d memory_limit=-1 /usr/local/bin/composer install
+      chdir: /var/www/html/magento2-2.4.5
+    become: true
+    become_user: ubuntu  # Spécifie que la commande doit être exécutée en tant qu'utilisateur ubuntu
+    environment:
+      COMPOSER_HOME: /var/www/html/magento2-2.4.5
+    tags: composer
+
+  - name: Exécuter le script d'installation automatisé de Magento sans Elasticsearch
+    ansible.builtin.command: >
+      php bin/magento setup:install
+      --base-url="{{ base_url }}"
+      --db-host="{{ db_host }}"
+      --db-name="{{ db_name }}"
+      --db-user="{{ db_user }}"
+      --db-password="{{ db_pass }}"
+      --admin-firstname="{{ admin_firstname }}"
+      --admin-lastname="{{ admin_lastname }}"
+      --admin-email="{{ admin_email }}"
+      --admin-user="{{ magento_admin_user }}"
+      --admin-password="{{ magento_admin_pass }}"
+      --language="{{ language }}"
+      --currency="{{ currency }}"
+      --timezone="{{ timezone }}"
+      --use-rewrites=1
+      --disable-modules="Magento_Elasticsearch,Magento_Elasticsearch6,Magento_Elasticsearch7"
+    args:
+      chdir: "/var/www/html/magento2-2.4.5"
+    become: true
+    become_user: ubuntu
+    tags: magento_install
